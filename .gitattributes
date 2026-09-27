@@ -1,0 +1,2 @@
+*.pmtiles binary -diff
+*.pbf binary -diff
