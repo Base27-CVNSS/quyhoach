@@ -33,7 +33,9 @@ WebGIS Vĩnh Long 2026
 
 ## Dataset PMTiles
 
-- File: `data/VinhLong.pmtiles`
+Archive canonical của hệ thống là `VinhLong.pmtiles`. Runtime ưu tiên `?pmtiles=https://...` khi truyền URL ngoài; nếu không có tham số này thì tìm file cục bộ tại `data/VinhLong.pmtiles`.
+
+- Canonical path: `data/VinhLong.pmtiles`
 - Spec: PMTiles v3
 - Vector tile: MVT/PBF + gzip
 - 117 lớp GIS
@@ -65,6 +67,15 @@ python -m http.server 8080
 ```
 
 Mở `http://localhost:8080`.
+
+## Bootstrap / kiểm tra PMTiles
+
+Workflow `.github/workflows/bootstrap-pmtiles.yml` không còn chứa URL tạm thời. Có hai chế độ an toàn:
+
+- nếu `data/VinhLong.pmtiles` đã có trong repo, workflow chỉ verify checksum/header;
+- nếu chưa có, chạy workflow thủ công và truyền một `source_url` ổn định để tải đúng archive, verify rồi commit.
+
+Nếu production dùng R2/CDN thì không bắt buộc phải commit file ~90 MB vào Git; chỉ cần giữ checksum, metadata contract và URL object versioned.
 
 ## R2/CDN production
 
