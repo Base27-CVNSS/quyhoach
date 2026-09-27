@@ -6,25 +6,56 @@ function u64(view, offset) {
   return Number(n);
 }
 
+function parseTotalSize(contentRange) {
+  const match = String(contentRange || "").match(/\/(\d+)$/);
+  return match ? Number(match[1]) : null;
+}
+
+function responseDiagnostics(response) {
+  const contentRange = response.headers.get("content-range");
+  return {
+    status: response.status,
+    contentRange,
+    acceptRanges: response.headers.get("accept-ranges"),
+    contentLength: Number(response.headers.get("content-length") || 0) || null,
+    totalSize: parseTotalSize(contentRange),
+    etag: response.headers.get("etag")
+  };
+}
+
 async function fetchRange(url, start, end) {
   const response = await fetch(url, {
+    method: "GET",
+    mode: "cors",
+    credentials: "omit",
     headers: { Range: `bytes=${start}-${end}` },
     cache: "no-store"
   });
 
-  if (!response.ok && response.status !== 206) {
+  if (response.status !== 200 && response.status !== 206) {
     throw new Error(`HTTP ${response.status} khi đọc PMTiles`);
   }
 
   const bytes = new Uint8Array(await response.arrayBuffer());
+  const diagnostics = responseDiagnostics(response);
 
-  // Một số server bỏ qua Range và trả 200/toàn file. Vẫn cắt đúng đoạn,
-  // nhưng production phải bật byte-range để tránh tải toàn bộ archive.
   if (response.status === 200 && bytes.length >= end + 1) {
-    return { bytes: bytes.slice(start, end + 1), rangeSupported: false };
+    return {
+      bytes: bytes.slice(start, end + 1),
+      rangeSupported: false,
+      diagnostics
+    };
   }
 
-  return { bytes, rangeSupported: response.status === 206 };
+  if (response.status === 206 && bytes.length !== end - start + 1) {
+    throw new Error(`HTTP Range trả sai kích thước: cần ${end - start + 1} byte, nhận ${bytes.length} byte.`);
+  }
+
+  return {
+    bytes,
+    rangeSupported: response.status === 206,
+    diagnostics
+  };
 }
 
 async function gunzip(bytes) {
@@ -47,17 +78,21 @@ export async function readPMTilesMetadata(url) {
   const metadataOffset = u64(view, 24);
   const metadataLength = u64(view, 32);
   const internalCompression = view.getUint8(97);
+  if (!metadataLength) throw new Error("PMTiles metadata rỗng.");
 
-  const metaPart = await fetchRange(
-    url,
-    metadataOffset,
-    metadataOffset + metadataLength - 1
-  );
-
+  const metaPart = await fetchRange(url, metadataOffset, metadataOffset + metadataLength - 1);
   let raw = metaPart.bytes;
+
   if (internalCompression === 2) raw = await gunzip(raw);
   else if (internalCompression !== 1) {
     throw new Error(`Internal compression ${internalCompression} chưa được hỗ trợ.`);
+  }
+
+  let metadata;
+  try {
+    metadata = JSON.parse(new TextDecoder().decode(raw));
+  } catch {
+    throw new Error("Metadata PMTiles không phải JSON hợp lệ.");
   }
 
   return {
@@ -73,7 +108,12 @@ export async function readPMTilesMetadata(url) {
       centerLon: view.getInt32(119, true) / 1e7,
       centerLat: view.getInt32(123, true) / 1e7
     },
-    metadata: JSON.parse(new TextDecoder().decode(raw)),
-    rangeSupported: head.rangeSupported && metaPart.rangeSupported
+    metadata,
+    rangeSupported: head.rangeSupported && metaPart.rangeSupported,
+    diagnostics: {
+      header: head.diagnostics,
+      metadata: metaPart.diagnostics,
+      totalSize: head.diagnostics.totalSize || metaPart.diagnostics.totalSize || null
+    }
   };
 }

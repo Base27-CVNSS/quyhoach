@@ -104,17 +104,21 @@ Runtime ưu tiên nguồn dữ liệu theo thứ tự:
 ```text
 1. ?pmtiles=https://.../VinhLong.pmtiles        # QA override
 2. data/pmtiles-source.json
-   └─ delivery.publicUrl                        # production
-3. data/VinhLong.pmtiles                        # local fallback
+   └─ delivery.publicUrl                        # production canonical
+3. src/config.js
+   └─ productionUrl                            # emergency fallback
+4. data/VinhLong.pmtiles                        # local fallback
 ```
 
 Khi `delivery.publicUrl` chưa có nhưng Catalog URI đã cấu hình, UI hiển thị trạng thái **R2 Catalog đồng bộ · chờ Public URL** thay vì báo lỗi 404.
 
-Public object URL phải trỏ trực tiếp đến:
+Public object hiện tại:
 
 ```text
-https://<custom-domain-hoac-r2.dev>/VinhLong.pmtiles
+https://pub-455588dd8bc84c5bab992d0db75a3a93.r2.dev/VinhLong.pmtiles
 ```
+
+Custom Domain vẫn là đích production dài hạn; `r2.dev` đang là delivery URL hoạt động hiện tại.
 
 và phải hỗ trợ HTTP byte range (`206 Partial Content`) cùng CORS cho origin `https://base27-cvnss.github.io`.
 
@@ -125,6 +129,9 @@ và phải hỗ trợ HTTP byte range (`206 Partial Content`) cùng CORS cho ori
 - Sai magic/spec/metadata → dừng nạp archive, không fallback âm thầm.
 - Server không hỗ trợ HTTP 206 → cảnh báo hiệu năng.
 - CDN CORS sai → báo lỗi rõ để sửa origin/header.
+- Runtime preflight từng nguồn bằng byte-range trước khi đăng ký vào MapLibre.
+- Manifest là cấu hình production canonical; `src/config.js productionUrl` là fallback chống lỗi manifest.
+- GitHub Action kiểm tra HTTP 206, CORS, magic PMTiles, spec và tổng size của object R2.
 
 ## 8. Bootstrap và kiểm tra archive
 

@@ -34,7 +34,10 @@ const runtime = {
   adminVisible: true,
   adminData: null,
   hoveredAdminId: null,
-  pmtilesReady: false
+  pmtilesReady: false,
+  source: null,
+  diagnostics: null,
+  sourceManifest: null
 };
 
 function setStatus(message, kind = "loading") {
@@ -497,55 +500,93 @@ function installControls(map) {
   });
 }
 
-async function resolvePlanningUrl() {
-  if (DATASET.queryUrl) return { url: DATASET.queryUrl, source: "query" };
-  if (DATASET.productionUrl) return { url: DATASET.productionUrl, source: "config-production" };
-
+async function loadSourceManifest() {
   try {
     const response = await fetch(DATASET.sourceManifestUrl, { cache: "no-store" });
-    if (response.ok) {
-      const manifest = await response.json();
-      const manifestUrl = String(manifest?.delivery?.publicUrl || manifest?.url || "").trim();
-      if (manifestUrl) return { url: manifestUrl, source: "manifest", manifest };
-      if (manifest?.catalog?.uri) return { url: "", source: "catalog-only", manifest };
-    }
+    if (!response.ok) return null;
+    const manifest = await response.json();
+    runtime.sourceManifest = manifest;
+    return manifest;
   } catch (error) {
     console.warn("Không đọc được pmtiles-source.json:", error);
+    return null;
+  }
+}
+
+function uniqueCandidates(candidates) {
+  const seen = new Set();
+  return candidates.filter((candidate) => {
+    const url = String(candidate?.url || "").trim();
+    if (!url || seen.has(url)) return false;
+    seen.add(url);
+    candidate.url = url;
+    return true;
+  });
+}
+
+function sourceLabel(resolved) {
+  if (resolved.source === "query") return "QA";
+  if (resolved.source === "local") return "LOCAL";
+  if (resolved.manifest?.provider === "cloudflare-r2" || /\.r2\.dev\//i.test(resolved.url)) return "R2";
+  return "CDN";
+}
+
+function validateArchiveContract(parsed, manifest) {
+  const expected = manifest?.expected || DATASET;
+  const warnings = [];
+  const layers = Array.isArray(parsed.metadata?.vector_layers) ? parsed.metadata.vector_layers.length : 0;
+
+  if (expected.layers && layers && layers !== Number(expected.layers)) warnings.push(`layer count ${layers}/${expected.layers}`);
+  if (expected.minZoom !== undefined && parsed.header.minZoom !== Number(expected.minZoom)) warnings.push(`minzoom z${parsed.header.minZoom}/z${expected.minZoom}`);
+  if (expected.maxZoom !== undefined && parsed.header.maxZoom !== Number(expected.maxZoom)) warnings.push(`maxzoom z${parsed.header.maxZoom}/z${expected.maxZoom}`);
+
+  const totalSize = parsed.diagnostics?.totalSize;
+  if (totalSize && expected.sizeBytes && totalSize !== Number(expected.sizeBytes)) warnings.push(`size ${totalSize}/${expected.sizeBytes}`);
+  return warnings;
+}
+
+async function resolvePlanningSource() {
+  if (DATASET.queryUrl) {
+    const parsed = await readPMTilesMetadata(DATASET.queryUrl);
+    return { url: DATASET.queryUrl, source: "query", manifest: null, parsed };
   }
 
-  try {
-    const probe = await fetch(DATASET.localUrl, {
-      method: "GET",
-      headers: { Range: "bytes=0-0" },
-      cache: "no-store"
-    });
-    if (probe.ok || probe.status === 206) {
-      return { url: DATASET.localUrl, source: "local" };
+  const manifest = await loadSourceManifest();
+  const candidates = uniqueCandidates([
+    { source: "manifest", url: manifest?.delivery?.publicUrl || manifest?.url || "", manifest },
+    { source: "config-production", url: DATASET.productionUrl || "", manifest },
+    { source: "local", url: DATASET.localUrl, manifest }
+  ]);
+
+  const failures = [];
+  for (const candidate of candidates) {
+    try {
+      const parsed = await readPMTilesMetadata(candidate.url);
+      return { ...candidate, parsed };
+    } catch (error) {
+      failures.push(`${candidate.source}: ${error.message}`);
+      console.warn("PMTiles candidate failed:", candidate.source, candidate.url, error);
     }
-  } catch (error) {
-    console.warn("Không tìm thấy PMTiles local:", error);
   }
 
-  return null;
+  throw new Error(`Không có nguồn PMTiles khả dụng. ${failures.join(" | ")}`);
 }
 
 async function initPlanningArchive(map, resolved) {
-  if (!resolved?.url) throw new Error("PMTILES_SOURCE_NOT_CONFIGURED");
-
   const planningUrl = resolved.url;
+  const parsed = resolved.parsed || await readPMTilesMetadata(planningUrl);
+  const header = parsed.header;
   const protocol = new window.pmtiles.Protocol({ metadata: true });
   maplibregl.addProtocol("pmtiles", protocol.tile);
   const archive = new window.pmtiles.PMTiles(planningUrl);
   protocol.add(archive);
 
-  setStatus("Đang đọc PMTiles…", "loading");
-  const [header, parsed] = await Promise.all([
-    archive.getHeader(),
-    readPMTilesMetadata(planningUrl)
-  ]);
-
   runtime.metadata = parsed.metadata;
   runtime.catalog = Array.isArray(parsed.metadata.vector_layers) ? parsed.metadata.vector_layers : [];
+  runtime.source = resolved;
+  runtime.diagnostics = parsed.diagnostics;
+
+  if (!runtime.catalog.length) throw new Error("PMTiles không có vector_layers metadata.");
 
   map.addSource(DATASET.id, {
     type: "vector",
@@ -560,20 +601,31 @@ async function initPlanningArchive(map, resolved) {
 
   const nonempty = runtime.catalog.filter(hasData).length;
   const counted = runtime.catalog.map(featureCount).filter((n) => n !== null);
-  const totalFeatures = counted.length
-    ? counted.reduce((sum, n) => sum + n, 0)
-    : DATASET.features;
+  const totalFeatures = counted.length ? counted.reduce((sum, n) => sum + n, 0) : DATASET.features;
+  const warnings = validateArchiveContract(parsed, resolved.manifest);
+  const label = sourceLabel(resolved);
 
-  els.statLayers.textContent = String(runtime.catalog.length || DATASET.sourceLayers);
+  els.statLayers.textContent = String(runtime.catalog.length);
   els.statFeatures.textContent = Number(totalFeatures).toLocaleString("vi-VN");
   els.statTiles.textContent = Number(DATASET.tiles).toLocaleString("vi-VN");
   els.statZoom.textContent = `z${header.minZoom}–${header.maxZoom}`;
 
-  if (parsed.rangeSupported) {
-    setStatus(`PMTiles OK · ${nonempty}/${runtime.catalog.length} lớp có dữ liệu`, "ok");
-  } else {
-    setStatus("PMTiles đọc được · máy chủ chưa tối ưu HTTP Range", "warn");
-  }
+  const rangeText = parsed.rangeSupported ? "HTTP 206" : "Range chưa tối ưu";
+  const statusText = warnings.length
+    ? `PMTiles ${label} · ${runtime.catalog.length} lớp · cần kiểm tra contract`
+    : `PMTiles ${label} OK · ${nonempty}/${runtime.catalog.length} lớp · ${rangeText}`;
+
+  setStatus(statusText, warnings.length || !parsed.rangeSupported ? "warn" : "ok");
+  els.status.title = [
+    planningUrl,
+    `Source: ${resolved.source}`,
+    `Range: ${parsed.rangeSupported ? "206 Partial Content" : "không xác nhận 206"}`,
+    parsed.diagnostics?.header?.contentRange ? `Content-Range: ${parsed.diagnostics.header.contentRange}` : "",
+    parsed.diagnostics?.header?.etag ? `ETag: ${parsed.diagnostics.header.etag}` : "",
+    warnings.length ? `Contract: ${warnings.join(", ")}` : "Contract: OK"
+  ].filter(Boolean).join("\n");
+
+  if (warnings.length) console.warn("PMTiles contract warnings:", warnings);
 }
 
 const map = new maplibregl.Map({
@@ -606,29 +658,14 @@ map.once("load", async () => {
   }
 
   try {
-    const resolved = await resolvePlanningUrl();
-    if (!resolved?.url) {
-      const catalogUri = resolved?.manifest?.catalog?.uri;
-      setStatus(catalogUri ? "R2 Catalog đồng bộ · chờ Public URL" : "Nền hành chính hoạt động · chờ URL R2", "warn");
-      clearError();
-      if (catalogUri) {
-        console.info("R2 Data Catalog đã cấu hình:", catalogUri);
-        console.info("Catalog URI không phải object URL. Hãy điền delivery.publicUrl bằng custom domain/r2.dev trỏ tới VinhLong.pmtiles.");
-      } else {
-        console.info("PMTiles chưa cấu hình. Hãy điền delivery.publicUrl trong data/pmtiles-source.json hoặc dùng ?pmtiles=");
-      }
-    } else {
-      await initPlanningArchive(map, resolved);
-      console.info("PMTiles source:", resolved.source, resolved.url);
-    }
+    const resolved = await resolvePlanningSource();
+    await initPlanningArchive(map, resolved);
+    console.info("PMTiles source:", resolved.source, resolved.url);
+    if (resolved.manifest?.catalog?.uri) console.info("R2 Data Catalog:", resolved.manifest.catalog.uri);
   } catch (error) {
     console.error(error);
-    setStatus("Nền hành chính hoạt động · PMTiles chưa sẵn sàng", "warn");
-    if (String(error?.message) === "PMTILES_SOURCE_NOT_CONFIGURED") {
-      clearError();
-    } else {
-      showError(`Không mở được VinhLong.pmtiles: ${error.message}. Kiểm tra delivery.publicUrl (custom domain/r2.dev) trong data/pmtiles-source.json hoặc dùng ?pmtiles=https://...`);
-    }
+    setStatus("Địa giới OK · PMTiles lỗi", "error");
+    showError(`Không mở được VinhLong.pmtiles: ${error.message}. Kiểm tra R2 Public URL/CORS/HTTP Range hoặc dùng ?pmtiles=https://... để QA.`);
   }
 
   renderLayerManager(map);

@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "provider": "cloudflare-r2",
   "accountId": "9e48dfe45ae2d641363f0503fda3a32f",
   "bucket": "vinhlong",
@@ -13,18 +13,29 @@
   },
   "delivery": {
     "publicUrl": "https://pub-455588dd8bc84c5bab992d0db75a3a93.r2.dev/VinhLong.pmtiles",
+    "mode": "r2.dev",
     "preferred": "custom-domain",
-    "developmentAlternative": "r2.dev",
     "objectKey": "VinhLong.pmtiles",
-    "requiredOrigin": "https://base27-cvnss.github.io",
-    "requireHttpRange": true,
-    "expectedRangeStatus": 206,
+    "corsPolicyConfigured": true,
+    "allowedOrigins": [
+      "https://base27-cvnss.github.io"
+    ],
+    "allowedMethods": [
+      "GET",
+      "HEAD"
+    ],
+    "allowedHeaders": [
+      "*"
+    ],
     "exposeHeaders": [
       "Accept-Ranges",
       "Content-Range",
       "Content-Length",
       "ETag"
-    ]
+    ],
+    "maxAgeSeconds": 86400,
+    "requireHttpRange": true,
+    "expectedRangeStatus": 206
   },
   "url": "https://pub-455588dd8bc84c5bab992d0db75a3a93.r2.dev/VinhLong.pmtiles",
   "expected": {
@@ -38,6 +49,6 @@
     "minZoom": 7,
     "maxZoom": 15
   },
-  "status": "public-r2-production-configured",
-  "note": "Production mặc định trỏ trực tiếp tới R2 Public Development URL /VinhLong.pmtiles. Runtime ưu tiên ?pmtiles= để QA, sau đó src/config.js productionUrl, tiếp theo manifest, cuối cùng local fallback. Catalog URI vẫn chỉ dành cho Apache Iceberg metadata/analytics."
+  "status": "r2-public-and-cors-configured",
+  "note": "Canonical runtime: ?pmtiles= QA override → manifest delivery.publicUrl → src/config.js productionUrl fallback → local fallback. R2 Data Catalog chỉ phục vụ Iceberg metadata/analytics; PMTiles dùng public object URL. Runtime và GitHub Action kiểm tra PMTiles v3 + HTTP 206 + CORS + size contract."
 }

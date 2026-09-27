@@ -1,97 +1,60 @@
-# Cloudflare R2 + CDN cho PMTiles
+# Cloudflare R2 + PMTiles · Vĩnh Long
 
-R2 là đích production khuyến nghị cho `VinhLong.pmtiles`. PMTiles cần **HTTP byte-range** và CORS đúng để trình duyệt chỉ tải tile cần thiết.
+## Trạng thái hiện tại
 
-## 1. Object layout
+- Account: `9e48dfe45ae2d641363f0503fda3a32f`
+- Bucket: `vinhlong`
+- Object key: `VinhLong.pmtiles`
+- Public development URL: `https://pub-455588dd8bc84c5bab992d0db75a3a93.r2.dev/VinhLong.pmtiles`
+- Data Catalog URI: `https://catalog.cloudflarestorage.com/9e48dfe45ae2d641363f0503fda3a32f/vinhlong`
+- WebGIS origin: `https://base27-cvnss.github.io`
 
-Khuyến nghị không ghi đè object production đang cache:
+R2 Data Catalog và PMTiles delivery là hai lớp khác nhau. Catalog URI dành cho Apache Iceberg metadata/analytics; MapLibre + PMTiles phải đọc public object URL.
 
-```text
-vietflex-pmtiles/
-└─ quyhoach/
-   └─ vinhlong/
-      ├─ v1/
-      │  └─ VinhLong.pmtiles
-      └─ latest.json
-```
-
-Ứng dụng có thể trỏ trực tiếp tới version bất biến:
-
-```text
-https://cdn.example.vn/quyhoach/vinhlong/v1/VinhLong.pmtiles
-```
-
-## 2. CORS gợi ý
-
-Trong R2, cho phép origin thực tế của WebGIS. Ví dụ:
+## CORS đang dùng
 
 ```json
 [
   {
-    "AllowedOrigins": [
-      "https://base27-cvnss.github.io"
-    ],
+    "AllowedOrigins": ["https://base27-cvnss.github.io"],
     "AllowedMethods": ["GET", "HEAD"],
-    "AllowedHeaders": ["Range"],
-    "ExposeHeaders": [
-      "ETag",
-      "Accept-Ranges",
-      "Content-Length",
-      "Content-Range"
-    ],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["Accept-Ranges", "Content-Range", "Content-Length", "ETag"],
     "MaxAgeSeconds": 86400
   }
 ]
 ```
 
-Nếu có domain riêng, thêm domain đó thay vì mở `*` không cần thiết.
-
-## 3. Cache
-
-Với object versioned:
-
-```text
-Cache-Control: public, max-age=31536000, immutable
-Content-Type: application/octet-stream
-```
-
-Không dùng cache immutable cho URL `latest` nếu nội dung có thể thay đổi.
-
-## 4. Kiểm tra byte-range
+## Kiểm tra HTTP Range
 
 ```bash
-curl -I -H "Range: bytes=0-16383" \
-  https://cdn.example.vn/quyhoach/vinhlong/v1/VinhLong.pmtiles
+curl -sS -D headers.txt -o header.bin \
+  -H "Origin: https://base27-cvnss.github.io" \
+  -H "Range: bytes=0-126" \
+  "https://pub-455588dd8bc84c5bab992d0db75a3a93.r2.dev/VinhLong.pmtiles"
 ```
 
-Kỳ vọng:
-- HTTP `206 Partial Content`
-- `Content-Range`
-- `Accept-Ranges: bytes` hoặc hành vi range tương đương
-- CORS cho origin WebGIS.
+Kỳ vọng: HTTP 206, body 127 byte, magic `PMTiles`, spec v3, `Content-Range` tổng size `94357111`, và CORS đúng origin.
 
-## 5. Chuyển WebGIS sang R2
+## Runtime
 
-Không cần sửa code. Mở:
+Production URL được khai báo ở hai nơi có chủ đích:
+
+1. `data/pmtiles-source.json -> delivery.publicUrl`: canonical;
+2. `src/config.js -> productionUrl`: emergency fallback.
+
+Ứng dụng ưu tiên:
 
 ```text
-https://base27-cvnss.github.io/quyhoach/?pmtiles=https://cdn.example.vn/quyhoach/vinhlong/v1/VinhLong.pmtiles
+?pmtiles= → manifest delivery.publicUrl → config productionUrl → local
 ```
 
-Sau khi QA xong, cập nhật `src/config.js` để URL R2 trở thành mặc định.
+Runtime preflight bằng HTTP Range trước khi tạo vector source.
 
-## 6. Nguyên tắc
+## CI
 
-GitHub chứa:
-- source code;
-- tài liệu;
-- checksum;
-- có thể chứa PMTiles demo nếu dưới giới hạn GitHub.
+`.github/workflows/verify-r2-production.yml` kiểm tra public delivery mà không tải toàn bộ archive.
 
-R2 chứa:
-- archive production;
-- versioned objects;
-- cache/CDN;
-- dữ liệu lớn tăng dần theo thời gian.
+## Custom Domain
 
-Không biến GitHub repo thành kho master GIS dài hạn.
+`r2.dev` đang hoạt động cho QA/triển khai hiện tại. Khi có domain riêng, gắn Custom Domain trực tiếp vào bucket `vinhlong`, QA bằng `?pmtiles=`, rồi thay `delivery.publicUrl` + `productionUrl`. UI và logic MapLibre không cần đổi.

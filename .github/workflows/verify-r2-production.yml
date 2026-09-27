@@ -1,0 +1,68 @@
+name: Verify R2 production PMTiles
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/config.js"
+      - "data/pmtiles-source.json"
+      - "src/pmtiles-meta.js"
+      - ".github/workflows/verify-r2-production.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vinhlong-r2-production-verify
+  cancel-in-progress: true
+
+jobs:
+  verify-r2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      PMTILES_URL: "https://pub-455588dd8bc84c5bab992d0db75a3a93.r2.dev/VinhLong.pmtiles"
+      ORIGIN: "https://base27-cvnss.github.io"
+      EXPECTED_SIZE: "94357111"
+
+    steps:
+      - name: Range + CORS + PMTiles header
+        shell: bash
+        run: |
+          set -euo pipefail
+          headers="$(mktemp)"
+          body="$(mktemp)"
+
+          code="$(curl --silent --show-error --location             --dump-header "$headers"             --output "$body"             --header "Origin: $ORIGIN"             --header "Range: bytes=0-126"             --write-out "%{http_code}"             "$PMTILES_URL")"
+
+          echo "HTTP $code"
+          cat "$headers"
+          test "$code" = "206"
+          test "$(stat -c%s "$body")" = "127"
+
+          python - "$headers" "$body" "$ORIGIN" "$EXPECTED_SIZE" <<'PY'
+          import pathlib, re, sys
+          headers_path, body_path, origin, expected_size = sys.argv[1:5]
+          raw = pathlib.Path(headers_path).read_text(errors="replace")
+          body = pathlib.Path(body_path).read_bytes()
+          blocks = [b for b in re.split(r"\r?\n\r?\n", raw) if b.strip()]
+          header_block = blocks[-1]
+          headers = {}
+          for line in header_block.splitlines()[1:]:
+              if ":" in line:
+                  key, value = line.split(":", 1)
+                  headers[key.strip().lower()] = value.strip()
+          assert body[:7] == b"PMTiles", f"bad magic: {body[:7]!r}"
+          assert body[7] == 3, f"expected PMTiles v3, got v{body[7]}"
+          content_range = headers.get("content-range", "")
+          match = re.search(r"/(\d+)$", content_range)
+          assert match, f"missing/invalid Content-Range: {content_range!r}"
+          assert match.group(1) == expected_size, f"size mismatch: {match.group(1)} != {expected_size}"
+          allow_origin = headers.get("access-control-allow-origin")
+          assert allow_origin in (origin, "*"), f"CORS mismatch: {allow_origin!r}, expected {origin!r}"
+          print("PMTiles v3 header: OK")
+          print("HTTP 206: OK")
+          print("Content-Range total size: OK")
+          print("CORS origin: OK")
+          PY
