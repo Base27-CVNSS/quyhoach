@@ -3,7 +3,7 @@
   "provider": "cloudflare-r2",
   "accountId": "9e48dfe45ae2d641363f0503fda3a32f",
   "bucket": "vinhlong",
-  "objectKey": "quyhoach/vinhlong/v1/VinhLong.pmtiles",
+  "objectKey": "VinhLong.pmtiles",
   "url": "",
   "expected": {
     "sizeBytes": 94357111,
@@ -14,6 +14,6 @@
     "minZoom": 7,
     "maxZoom": 15
   },
-  "status": "awaiting-public-r2-url",
-  "note": "Điền URL public R2/custom domain vào trường url. Runtime ưu tiên ?pmtiles=, sau đó manifest này, cuối cùng mới probe file local."
+  "status": "uploaded-awaiting-public-r2-url",
+  "note": "Object thực tế đã được upload tại bucket vinhlong / VinhLong.pmtiles. Điền URL public R2/custom domain vào trường url. Runtime ưu tiên ?pmtiles=, sau đó manifest này, cuối cùng mới probe file local."
 }
