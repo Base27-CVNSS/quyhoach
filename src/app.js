@@ -497,16 +497,49 @@ function installControls(map) {
   });
 }
 
-async function initPlanningArchive(map) {
+async function resolvePlanningUrl() {
+  if (DATASET.queryUrl) return { url: DATASET.queryUrl, source: "query" };
+
+  try {
+    const response = await fetch(DATASET.sourceManifestUrl, { cache: "no-store" });
+    if (response.ok) {
+      const manifest = await response.json();
+      const manifestUrl = String(manifest?.url || "").trim();
+      if (manifestUrl) return { url: manifestUrl, source: "manifest", manifest };
+    }
+  } catch (error) {
+    console.warn("Không đọc được pmtiles-source.json:", error);
+  }
+
+  try {
+    const probe = await fetch(DATASET.localUrl, {
+      method: "GET",
+      headers: { Range: "bytes=0-0" },
+      cache: "no-store"
+    });
+    if (probe.ok || probe.status === 206) {
+      return { url: DATASET.localUrl, source: "local" };
+    }
+  } catch (error) {
+    console.warn("Không tìm thấy PMTiles local:", error);
+  }
+
+  return null;
+}
+
+async function initPlanningArchive(map, resolved) {
+  if (!resolved?.url) throw new Error("PMTILES_SOURCE_NOT_CONFIGURED");
+
+  const planningUrl = resolved.url;
   const protocol = new window.pmtiles.Protocol({ metadata: true });
   maplibregl.addProtocol("pmtiles", protocol.tile);
-  const archive = new window.pmtiles.PMTiles(DATASET.url);
+  const archive = new window.pmtiles.PMTiles(planningUrl);
   protocol.add(archive);
 
   setStatus("Đang đọc PMTiles…", "loading");
   const [header, parsed] = await Promise.all([
     archive.getHeader(),
-    readPMTilesMetadata(DATASET.url)
+    readPMTilesMetadata(planningUrl)
   ]);
 
   runtime.metadata = parsed.metadata;
@@ -514,7 +547,7 @@ async function initPlanningArchive(map) {
 
   map.addSource(DATASET.id, {
     type: "vector",
-    url: `pmtiles://${DATASET.url}`,
+    url: `pmtiles://${planningUrl}`,
     minzoom: header.minZoom,
     maxzoom: header.maxZoom
   });
@@ -571,11 +604,23 @@ map.once("load", async () => {
   }
 
   try {
-    await initPlanningArchive(map);
+    const resolved = await resolvePlanningUrl();
+    if (!resolved) {
+      setStatus("Nền hành chính hoạt động · chờ URL R2", "warn");
+      clearError();
+      console.info("PMTiles chưa cấu hình. Hãy điền URL public vào data/pmtiles-source.json hoặc dùng ?pmtiles=");
+    } else {
+      await initPlanningArchive(map, resolved);
+      console.info("PMTiles source:", resolved.source, resolved.url);
+    }
   } catch (error) {
     console.error(error);
     setStatus("Nền hành chính hoạt động · PMTiles chưa sẵn sàng", "warn");
-    showError(`Không mở được VinhLong.pmtiles: ${error.message}. Kiểm tra data/VinhLong.pmtiles hoặc truyền ?pmtiles=https://... tới R2/CDN.`);
+    if (String(error?.message) === "PMTILES_SOURCE_NOT_CONFIGURED") {
+      clearError();
+    } else {
+      showError(`Không mở được VinhLong.pmtiles: ${error.message}. Kiểm tra URL R2/CDN trong data/pmtiles-source.json hoặc dùng ?pmtiles=https://...`);
+    }
   }
 
   renderLayerManager(map);
