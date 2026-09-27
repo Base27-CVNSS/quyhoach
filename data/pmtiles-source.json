@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "provider": "cloudflare-r2",
+  "accountId": "9e48dfe45ae2d641363f0503fda3a32f",
+  "bucket": "vinhlong",
+  "objectKey": "quyhoach/vinhlong/v1/VinhLong.pmtiles",
+  "url": "",
+  "expected": {
+    "sizeBytes": 94357111,
+    "sha256": "dd17f53abe450c6d31615a09fffd312a84a263381cdd23c117a87a22f0fd68bf",
+    "pmtilesSpec": 3,
+    "layers": 117,
+    "features": 165017,
+    "minZoom": 7,
+    "maxZoom": 15
+  },
+  "status": "awaiting-public-r2-url",
+  "note": "Điền URL public R2/custom domain vào trường url. Runtime ưu tiên ?pmtiles=, sau đó manifest này, cuối cùng mới probe file local."
+}
