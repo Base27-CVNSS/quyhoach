@@ -1,80 +1,64 @@
-# Vietflex Quy hoạch — Vĩnh Long PMTiles WebGIS
+# Vĩnh Long · Cổng WebGIS Quy hoạch
 
-WebGIS quy hoạch Vĩnh Long theo kiến trúc **single-file vector tiles**: dữ liệu gốc được biên dịch thành một PMTiles v3 đa lớp và phân phối bằng HTTP Range Request tới MapLibre GL JS.
+WebGIS này lấy **khung nền hành chính Vĩnh Long 2026** từ dự án `webgis-vinhlong/webgis-vinhlong.github.io` làm lớp định vị, sau đó chồng **toàn bộ dữ liệu quy hoạch trong `VinhLong.pmtiles`** lên MapLibre GL JS.
+
+## Kiến trúc
 
 ```text
-                 MASTER DATA
-                 VinhLong.gdb
-                      │
-                      ▼
-                VinhLong.pmtiles
-              94,357,111 bytes
-                      │
-         ┌────────────┴────────────┐
-         ▼                         ▼
-   GitHub Pages              Cloudflare R2
-                                 + CDN
-         │                         │
-         └────────────┬────────────┘
-                      ▼
-              PMTiles Protocol
-                      │
-                      ▼
-             MapLibre GL JS
-                      │
-                      ▼
-              Vietflex WebGIS
+WebGIS Vĩnh Long 2026
+        │
+        ├─ địa giới 124 xã/phường
+        │   data/vinhlong-admin-2026.geojson
+        │
+        ▼
+   MapLibre GL JS
+        ▲
+        │ PMTiles protocol + HTTP Range
+        │
+ VinhLong.pmtiles
+   117 lớp GIS
+        │
+        ├─ GitHub Pages  → demo / QA
+        └─ R2 + CDN      → production dài hạn
 ```
 
-## Dataset
+### Nguyên tắc cốt lõi
 
-- PMTiles: `data/VinhLong.pmtiles`
-- PMTiles spec: v3
+- Không nhúng 117 lớp thành GeoJSON vào HTML.
+- PMTiles là **artifact phân phối gốc**, metadata `vector_layers` là source of truth cho catalog.
+- Runtime tự phát hiện toàn bộ lớp, min/max zoom, geometry và số feature khi có metadata.
+- Lớp nền hành chính độc lập với PMTiles: PMTiles lỗi thì địa giới và basemap vẫn chạy.
+- Có thể đổi PMTiles sang Cloudflare R2/CDN bằng tham số `?pmtiles=https://...` mà không sửa UI.
+- Master GIS vẫn nên được giữ riêng ở FileGDB/GeoPackage/PostGIS/GeoParquet; PMTiles là bản web tối ưu, không phải nơi biên tập.
+
+## Dataset PMTiles
+
+- File: `data/VinhLong.pmtiles`
+- Spec: PMTiles v3
 - Vector tile: MVT/PBF + gzip
 - 117 lớp GIS
-- 95 lớp có dữ liệu, 22 lớp rỗng
+- 95 lớp có dữ liệu
 - 165.017 feature
 - 7.485 vector tiles
-- Zoom: z7–z15
+- Zoom z7–z15
 - Bounds: `105.5898088, 9.3994054, 106.8586394, 10.4697316`
+- Size: `94,357,111` bytes
 - SHA-256: `dd17f53abe450c6d31615a09fffd312a84a263381cdd23c117a87a22f0fd68bf`
 
-### Multi-scale policy
+## Chức năng
 
-- `HienTrangSuDungDatCapTinh_A`: z12–z15, 144.600 polygon; z15 giữ chi tiết cao.
-- `PhuongAnPhanBoKhoanhVungDatDai_A`: z10–z15, 12.332 polygon.
-- Điểm: chủ yếu z8–z15.
-- Đường: chủ yếu z7–z15.
-- Polygon nền: chủ yếu z7–z15.
-- Ba vùng hình học cực phức tạp dùng z10–z14 để kiểm soát dung lượng.
+- 3 basemap: đường phố, vệ tinh, địa hình.
+- Địa giới Vĩnh Long 2026 luôn độc lập, viền xanh nổi rõ.
+- Danh mục tự sinh từ metadata PMTiles.
+- Lọc theo Hiện trạng / Định hướng / Phương án / Khác.
+- Tìm lớp, bật/tắt từng lớp, bật lớp chính hoặc lớp phù hợp zoom.
+- Click đối tượng quy hoạch hoặc địa giới để xem thuộc tính.
+- URL hash giữ vị trí bản đồ.
+- Giao diện desktop/mobile.
 
-## Cấu trúc
+## Chạy local
 
-```text
-/
-├─ index.html
-├─ assets/
-│  └─ styles.css
-├─ src/
-│  ├─ app.js
-│  ├─ config.js
-│  └─ pmtiles-meta.js
-├─ data/
-│  ├─ VinhLong.pmtiles
-│  ├─ VinhLong.pmtiles.sha256
-│  └─ README.md
-├─ docs/
-│  ├─ ARCHITECTURE.md
-│  └─ CLOUDFLARE_R2.md
-├─ tools/
-│  └─ verify_pmtiles.py
-├─ .gitattributes
-└─ .nojekyll
-```
-
-## Chạy
-
-Không mở bằng `file://`. Hãy phục vụ qua HTTP để Range Request hoạt động.
+Không mở bằng `file://`; PMTiles cần HTTP Range.
 
 ```bash
 python -m http.server 8080
@@ -82,36 +66,24 @@ python -m http.server 8080
 
 Mở `http://localhost:8080`.
 
-Mặc định ứng dụng dùng `./data/VinhLong.pmtiles`. Có thể thử nguồn R2/CDN mà không sửa code:
+## R2/CDN production
 
 ```text
-https://base27-cvnss.github.io/quyhoach/?pmtiles=https://cdn.example.com/VinhLong.pmtiles
+https://base27-cvnss.github.io/quyhoach/?pmtiles=https://cdn.example.vn/quyhoach/vinhlong/v1/VinhLong.pmtiles
 ```
 
-## Thiết kế runtime
+Khuyến nghị object versioned + cache immutable. Xem `docs/CLOUDFLARE_R2.md`.
 
-Ứng dụng đọc metadata `vector_layers` trực tiếp từ PMTiles bằng Range Request, sau đó tự tạo layer manager cho toàn bộ lớp. Lớp rỗng vẫn xuất hiện trong catalog nhưng bị vô hiệu hóa. Chỉ một nhóm lớp quan trọng được bật mặc định để giảm tải render.
-
-MapLibre GL JS được ghim major version; PMTiles JS được ghim version cụ thể. Không cần API key để đọc PMTiles.
-
-## Phân phối
-
-- **GitHub Pages**: phù hợp demo/QA.
-- **Cloudflare R2 + CDN**: khuyến nghị production; xem `docs/CLOUDFLARE_R2.md`.
-- Client chỉ tải header/directory và các byte range của tile đang nhìn, không tải toàn bộ ~90 MB.
-
-## Kiểm tra dữ liệu
+## Kiểm tra archive
 
 ```bash
 python tools/verify_pmtiles.py data/VinhLong.pmtiles
 ```
 
-## Nguồn mở
+## Nguồn
 
-- MapLibre GL JS: BSD-3-Clause
-- PMTiles: BSD-3-Clause
-- Basemap demo MapLibre chỉ dùng cho khung thử nghiệm; production nên thay bằng basemap/CDN do đơn vị quản lý.
-
-## License
-
-Mã nguồn khung: MIT. Dữ liệu GIS có thể có điều kiện cấp phép riêng và không mặc nhiên theo MIT.
+- Baseline hành chính: `webgis-vinhlong/webgis-vinhlong.github.io`.
+- MapLibre GL JS: BSD-3-Clause.
+- PMTiles: BSD-3-Clause.
+- OpenStreetMap / OpenTopoMap / Esri basemap theo điều khoản nguồn tương ứng.
+- Mã nguồn khung repo: MIT; dữ liệu GIS có thể có điều kiện cấp phép riêng.

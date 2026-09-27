@@ -1,29 +1,35 @@
-name: Bootstrap Vinh Long PMTiles
+name: Bootstrap immutable Vinh Long PMTiles
 
 on:
   push:
     branches: [main]
     paths:
       - ".github/workflows/bootstrap-pmtiles.yml"
+  workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: bootstrap-vinhlong-pmtiles
+  cancel-in-progress: false
 
 jobs:
   bootstrap:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     env:
       SOURCE_URL: 'https://sdmntprindiasocentral.oaiusercontent.com/files/00000000-b640-8211-bd9b-a213503462b0/raw?se=2026-09-27T11%3A06%3A32Z&sp=r&sv=2026-02-06&sr=b&scid=e496a306-b7a2-5960-ba81-e02d552a6e4d&skoid=54865dd2-31dc-44cc-a877-635aa4250446&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-27T00%3A57%3A01Z&ske=2026-09-28T00%3A57%3A01Z&sks=b&skv=2026-02-06&sig=BjSQK9oAttZn63QLvsIUjBBk3mvE7OeToD9GTDcLylg%3D'
       EXPECTED_SHA256: dd17f53abe450c6d31615a09fffd312a84a263381cdd23c117a87a22f0fd68bf
       EXPECTED_SIZE: "94357111"
+
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
-      - name: Download immutable PMTiles snapshot
+      - name: Download and verify immutable archive
         shell: bash
         run: |
           set -euo pipefail
@@ -33,7 +39,7 @@ jobs:
           echo "$EXPECTED_SHA256  data/VinhLong.pmtiles" | sha256sum -c -
           python tools/verify_pmtiles.py data/VinhLong.pmtiles
 
-      - name: Commit archive and remove bootstrap workflow
+      - name: Commit archive safely
         shell: bash
         run: |
           set -euo pipefail
@@ -42,4 +48,15 @@ jobs:
           git add data/VinhLong.pmtiles
           git rm .github/workflows/bootstrap-pmtiles.yml
           git commit -m "data: add immutable Vinh Long PMTiles archive"
-          git push
+
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git rebase origin/main
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            sleep $((attempt * 3))
+          done
+
+          echo "Unable to push PMTiles archive after retries." >&2
+          exit 1
