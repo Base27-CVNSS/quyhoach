@@ -4,6 +4,7 @@ export const DATASET = {
   id: "vinhlong-planning",
   name: "Quy hoạch tỉnh Vĩnh Long",
   localUrl: new URL("../data/VinhLong.pmtiles", import.meta.url).href,
+  productionUrl: "https://pub-455588dd8bc84c5bab992d0db75a3a93.r2.dev/VinhLong.pmtiles",
   queryUrl: query.get("pmtiles") || "",
   sourceManifestUrl: new URL("../data/pmtiles-source.json", import.meta.url).href,
   adminUrl: new URL("../data/vinhlong-admin-2026.geojson", import.meta.url).href,

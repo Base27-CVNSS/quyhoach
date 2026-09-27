@@ -12,7 +12,7 @@
     "servesPmtilesDirectly": false
   },
   "delivery": {
-    "publicUrl": "",
+    "publicUrl": "https://pub-455588dd8bc84c5bab992d0db75a3a93.r2.dev/VinhLong.pmtiles",
     "preferred": "custom-domain",
     "developmentAlternative": "r2.dev",
     "objectKey": "VinhLong.pmtiles",
@@ -26,7 +26,7 @@
       "ETag"
     ]
   },
-  "url": "",
+  "url": "https://pub-455588dd8bc84c5bab992d0db75a3a93.r2.dev/VinhLong.pmtiles",
   "expected": {
     "sizeBytes": 94357111,
     "sha256": "dd17f53abe450c6d31615a09fffd312a84a263381cdd23c117a87a22f0fd68bf",
@@ -38,6 +38,6 @@
     "minZoom": 7,
     "maxZoom": 15
   },
-  "status": "catalog-synced-awaiting-public-object-url",
-  "note": "Catalog URI chỉ dành cho R2 Data Catalog/Apache Iceberg, không phải URL tải object PMTiles. Điền delivery.publicUrl bằng custom domain hoặc r2.dev trỏ tới /VinhLong.pmtiles. Runtime ưu tiên ?pmtiles=, sau đó delivery.publicUrl/url, cuối cùng mới probe file local."
+  "status": "public-r2-production-configured",
+  "note": "Production mặc định trỏ trực tiếp tới R2 Public Development URL /VinhLong.pmtiles. Runtime ưu tiên ?pmtiles= để QA, sau đó src/config.js productionUrl, tiếp theo manifest, cuối cùng local fallback. Catalog URI vẫn chỉ dành cho Apache Iceberg metadata/analytics."
 }

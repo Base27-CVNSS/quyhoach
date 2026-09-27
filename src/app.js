@@ -499,6 +499,7 @@ function installControls(map) {
 
 async function resolvePlanningUrl() {
   if (DATASET.queryUrl) return { url: DATASET.queryUrl, source: "query" };
+  if (DATASET.productionUrl) return { url: DATASET.productionUrl, source: "config-production" };
 
   try {
     const response = await fetch(DATASET.sourceManifestUrl, { cache: "no-store" });
