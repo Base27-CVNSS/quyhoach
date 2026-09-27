@@ -1,19 +1,43 @@
 {
-  "version": 1,
+  "version": 2,
   "provider": "cloudflare-r2",
   "accountId": "9e48dfe45ae2d641363f0503fda3a32f",
   "bucket": "vinhlong",
   "objectKey": "VinhLong.pmtiles",
+  "catalog": {
+    "type": "r2-data-catalog",
+    "uri": "https://catalog.cloudflarestorage.com/9e48dfe45ae2d641363f0503fda3a32f/vinhlong",
+    "warehouse": "9e48dfe45ae2d641363f0503fda3a32f_vinhlong",
+    "role": "apache-iceberg-metadata-and-analytics",
+    "servesPmtilesDirectly": false
+  },
+  "delivery": {
+    "publicUrl": "",
+    "preferred": "custom-domain",
+    "developmentAlternative": "r2.dev",
+    "objectKey": "VinhLong.pmtiles",
+    "requiredOrigin": "https://base27-cvnss.github.io",
+    "requireHttpRange": true,
+    "expectedRangeStatus": 206,
+    "exposeHeaders": [
+      "Accept-Ranges",
+      "Content-Range",
+      "Content-Length",
+      "ETag"
+    ]
+  },
   "url": "",
   "expected": {
     "sizeBytes": 94357111,
     "sha256": "dd17f53abe450c6d31615a09fffd312a84a263381cdd23c117a87a22f0fd68bf",
     "pmtilesSpec": 3,
     "layers": 117,
+    "nonEmptyLayers": 95,
     "features": 165017,
+    "tiles": 7485,
     "minZoom": 7,
     "maxZoom": 15
   },
-  "status": "uploaded-awaiting-public-r2-url",
-  "note": "Object thực tế đã được upload tại bucket vinhlong / VinhLong.pmtiles. Điền URL public R2/custom domain vào trường url. Runtime ưu tiên ?pmtiles=, sau đó manifest này, cuối cùng mới probe file local."
+  "status": "catalog-synced-awaiting-public-object-url",
+  "note": "Catalog URI chỉ dành cho R2 Data Catalog/Apache Iceberg, không phải URL tải object PMTiles. Điền delivery.publicUrl bằng custom domain hoặc r2.dev trỏ tới /VinhLong.pmtiles. Runtime ưu tiên ?pmtiles=, sau đó delivery.publicUrl/url, cuối cùng mới probe file local."
 }

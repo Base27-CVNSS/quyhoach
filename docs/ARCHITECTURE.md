@@ -87,21 +87,36 @@ Nhờ đó catalog vẫn hoạt động nếu metadata không chứa `geometry_t
 
 Không đưa toàn bộ chi tiết đất đai lên zoom thấp.
 
-## 6. Nguồn PMTiles
+## 6. Cloudflare R2: Catalog và Delivery là hai vai trò khác nhau
 
-Runtime ưu tiên:
+Bucket canonical:
+
+- account: `9e48dfe45ae2d641363f0503fda3a32f`
+- bucket: `vinhlong`
+- object key: `VinhLong.pmtiles`
+- Data Catalog URI: `https://catalog.cloudflarestorage.com/9e48dfe45ae2d641363f0503fda3a32f/vinhlong`
+- warehouse: `9e48dfe45ae2d641363f0503fda3a32f_vinhlong`
+
+**R2 Data Catalog không phải đường dẫn phục vụ PMTiles.** Catalog URI là endpoint Apache Iceberg REST cho metadata/analytics. MapLibre + PMTiles cần một URL object công khai riêng qua **Custom Domain** (khuyến nghị production) hoặc `r2.dev` (QA/development).
+
+Runtime ưu tiên nguồn dữ liệu theo thứ tự:
 
 ```text
-?pmtiles=https://cdn.example.vn/.../VinhLong.pmtiles
+1. ?pmtiles=https://.../VinhLong.pmtiles        # QA override
+2. data/pmtiles-source.json
+   └─ delivery.publicUrl                        # production
+3. data/VinhLong.pmtiles                        # local fallback
 ```
 
-Nếu không có tham số, runtime dùng:
+Khi `delivery.publicUrl` chưa có nhưng Catalog URI đã cấu hình, UI hiển thị trạng thái **R2 Catalog đồng bộ · chờ Public URL** thay vì báo lỗi 404.
+
+Public object URL phải trỏ trực tiếp đến:
 
 ```text
-data/VinhLong.pmtiles
+https://<custom-domain-hoac-r2.dev>/VinhLong.pmtiles
 ```
 
-Do vậy production có thể dùng R2/CDN mà không phải sửa UI.
+và phải hỗ trợ HTTP byte range (`206 Partial Content`) cùng CORS cho origin `https://base27-cvnss.github.io`.
 
 ## 7. Failure behavior
 
@@ -122,6 +137,8 @@ Workflow `.github/workflows/bootstrap-pmtiles.yml`:
 Không lưu URL ký tạm thời trong repo.
 
 ## 9. Production long-term
+
+Ưu tiên Custom Domain gắn trực tiếp với bucket R2 để có CDN/cache production. `r2.dev` chỉ dùng QA/development. Sau khi có public object URL, ghi nó vào `data/pmtiles-source.json -> delivery.publicUrl`; không dùng Catalog URI thay thế.
 
 Khuyến nghị object versioned:
 

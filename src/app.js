@@ -504,8 +504,9 @@ async function resolvePlanningUrl() {
     const response = await fetch(DATASET.sourceManifestUrl, { cache: "no-store" });
     if (response.ok) {
       const manifest = await response.json();
-      const manifestUrl = String(manifest?.url || "").trim();
+      const manifestUrl = String(manifest?.delivery?.publicUrl || manifest?.url || "").trim();
       if (manifestUrl) return { url: manifestUrl, source: "manifest", manifest };
+      if (manifest?.catalog?.uri) return { url: "", source: "catalog-only", manifest };
     }
   } catch (error) {
     console.warn("Không đọc được pmtiles-source.json:", error);
@@ -605,10 +606,16 @@ map.once("load", async () => {
 
   try {
     const resolved = await resolvePlanningUrl();
-    if (!resolved) {
-      setStatus("Nền hành chính hoạt động · chờ URL R2", "warn");
+    if (!resolved?.url) {
+      const catalogUri = resolved?.manifest?.catalog?.uri;
+      setStatus(catalogUri ? "R2 Catalog đồng bộ · chờ Public URL" : "Nền hành chính hoạt động · chờ URL R2", "warn");
       clearError();
-      console.info("PMTiles chưa cấu hình. Hãy điền URL public vào data/pmtiles-source.json hoặc dùng ?pmtiles=");
+      if (catalogUri) {
+        console.info("R2 Data Catalog đã cấu hình:", catalogUri);
+        console.info("Catalog URI không phải object URL. Hãy điền delivery.publicUrl bằng custom domain/r2.dev trỏ tới VinhLong.pmtiles.");
+      } else {
+        console.info("PMTiles chưa cấu hình. Hãy điền delivery.publicUrl trong data/pmtiles-source.json hoặc dùng ?pmtiles=");
+      }
     } else {
       await initPlanningArchive(map, resolved);
       console.info("PMTiles source:", resolved.source, resolved.url);
@@ -619,7 +626,7 @@ map.once("load", async () => {
     if (String(error?.message) === "PMTILES_SOURCE_NOT_CONFIGURED") {
       clearError();
     } else {
-      showError(`Không mở được VinhLong.pmtiles: ${error.message}. Kiểm tra URL R2/CDN trong data/pmtiles-source.json hoặc dùng ?pmtiles=https://...`);
+      showError(`Không mở được VinhLong.pmtiles: ${error.message}. Kiểm tra delivery.publicUrl (custom domain/r2.dev) trong data/pmtiles-source.json hoặc dùng ?pmtiles=https://...`);
     }
   }
 
