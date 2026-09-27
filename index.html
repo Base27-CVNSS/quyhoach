@@ -2,65 +2,124 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#0b1f33" />
-  <title>Vietflex Quy hoạch Vĩnh Long</title>
-  <meta name="description" content="WebGIS quy hoạch Vĩnh Long sử dụng PMTiles đa lớp và MapLibre GL JS." />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#0f3d68" />
+  <meta name="description" content="WebGIS quy hoạch tỉnh Vĩnh Long: 117 lớp GIS đa tỷ lệ, PMTiles v3, địa giới 124 xã phường và lớp nền WebGIS Vĩnh Long." />
+  <title>Vĩnh Long · Cổng WebGIS Quy hoạch</title>
+  <link rel="preconnect" href="https://unpkg.com" crossorigin />
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.11.2/dist/maplibre-gl.css" />
   <link rel="stylesheet" href="./assets/styles.css" />
 </head>
 <body>
   <div id="app">
-    <aside class="sidebar" aria-label="Danh mục lớp dữ liệu">
-      <header class="brand">
-        <div class="brand-mark">VF</div>
-        <div>
-          <h1>Vietflex Quy hoạch</h1>
-          <p>Vĩnh Long · PMTiles WebGIS</p>
-        </div>
-      </header>
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="Trang chính WebGIS Quy hoạch Vĩnh Long">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M3 18.5 8.2 5l4.1 8.1L15.7 7 21 18.5h-3.1l-2.3-5.1-3.4 6.1-4-7.9-2.1 6.9H3Z"/></svg>
+        </span>
+        <span class="brand-copy">
+          <strong>VĨNH LONG · QUY HOẠCH</strong>
+          <small>Vietflex WebGIS · PMTiles</small>
+        </span>
+      </a>
 
-      <section class="dataset-card">
-        <div class="dataset-title">VinhLong.pmtiles</div>
-        <div class="stats-grid">
-          <div><strong id="statLayers">117</strong><span>lớp</span></div>
-          <div><strong id="statFeatures">165.017</strong><span>feature</span></div>
-          <div><strong id="statTiles">7.485</strong><span>tiles</span></div>
-          <div><strong id="statZoom">z7–15</strong><span>zoom</span></div>
-        </div>
-        <div id="datasetStatus" class="status status-loading">Đang đọc PMTiles…</div>
-      </section>
-
-      <section class="toolbar">
-        <input id="layerSearch" type="search" placeholder="Tìm lớp…" autocomplete="off" />
-        <div class="toolbar-row">
-          <button id="showDefaults" type="button">Lớp mặc định</button>
-          <button id="hideAll" type="button">Tắt tất cả</button>
-          <button id="fitBounds" type="button">Toàn tỉnh</button>
-        </div>
-      </section>
-
-      <section class="legend">
-        <span><i class="swatch current"></i>Hiện trạng</span>
-        <span><i class="swatch planned"></i>Định hướng</span>
-        <span><i class="swatch allocation"></i>Phương án</span>
-      </section>
-
-      <section id="layerList" class="layer-list" aria-live="polite"></section>
-
-      <footer class="sidebar-footer">
-        <span>PMTiles v3 · MVT · HTTP Range</span>
-        <a href="https://github.com/Base27-CVNSS/quyhoach" target="_blank" rel="noreferrer">GitHub</a>
-      </footer>
-    </aside>
-
-    <main class="map-shell">
-      <div id="map"></div>
-      <div class="map-title">
-        <strong>Quy hoạch tỉnh Vĩnh Long</strong>
-        <span id="zoomBadge">z9.0</span>
+      <div class="global-search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.4-4.4m2.4-5.1a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z"/></svg>
+        <input id="layerSearch" type="search" placeholder="Tìm lớp quy hoạch, hiện trạng, hạ tầng…" autocomplete="off" />
+        <kbd>/</kbd>
       </div>
-      <div id="errorBanner" class="error-banner" hidden></div>
+
+      <div class="top-actions">
+        <button id="fitBounds" class="top-btn" type="button">Toàn tỉnh</button>
+        <a class="top-btn link-btn" href="https://github.com/Base27-CVNSS/quyhoach" target="_blank" rel="noreferrer">Mã nguồn</a>
+      </div>
+    </header>
+
+    <nav class="toolbar" aria-label="Công cụ bản đồ">
+      <div id="groupFilters" class="chips">
+        <button class="chip active" data-group="Tất cả" type="button">Tất cả</button>
+        <button class="chip" data-group="Hiện trạng" type="button">Hiện trạng</button>
+        <button class="chip" data-group="Định hướng" type="button">Định hướng</button>
+        <button class="chip" data-group="Phương án" type="button">Phương án</button>
+        <button class="chip" data-group="Khác" type="button">Khác</button>
+      </div>
+      <div class="toolbar-spacer"></div>
+      <label class="basemap-select">
+        <span>Lớp nền</span>
+        <select id="basemapSelect" aria-label="Chọn lớp nền"></select>
+      </label>
+      <button id="adminToggle" class="tool-btn active" type="button" aria-pressed="true">Địa giới 124 xã/phường</button>
+      <button id="sidebarToggle" class="tool-btn mobile-only" type="button">Danh mục lớp</button>
+    </nav>
+
+    <main class="workspace">
+      <aside id="sidebar" class="sidebar">
+        <section class="dataset-head">
+          <div>
+            <span class="eyebrow">DATASET PRODUCTION</span>
+            <h1>Quy hoạch tỉnh Vĩnh Long</h1>
+            <p>117 lớp vector · PMTiles v3 · MVT/PBF · WGS84</p>
+          </div>
+          <span id="datasetStatus" class="status status-loading">Đang kết nối…</span>
+        </section>
+
+        <section class="stats-grid" aria-label="Thống kê dữ liệu">
+          <article><b id="statLayers">117</b><span>Lớp GIS</span></article>
+          <article><b id="statFeatures">165.017</b><span>Đối tượng</span></article>
+          <article><b id="statTiles">7.485</b><span>Vector tile</span></article>
+          <article><b id="statZoom">z7–15</b><span>Đa tỷ lệ</span></article>
+        </section>
+
+        <section class="layer-actions">
+          <button id="showDefaults" type="button">Lớp chính</button>
+          <button id="hideAll" type="button">Tắt quy hoạch</button>
+          <button id="showAllAtZoom" type="button">Bật lớp phù hợp zoom</button>
+        </section>
+
+        <div class="list-heading">
+          <div>
+            <strong>Danh mục lớp</strong>
+            <span id="layerSummary">Đang đọc metadata…</span>
+          </div>
+          <span class="dot-live"></span>
+        </div>
+
+        <section id="layerList" class="layer-list" aria-live="polite"></section>
+
+        <footer class="sidebar-footer">
+          <div>
+            <strong>Kiến trúc dữ liệu</strong>
+            <span>Master GIS → PMTiles → HTTP Range → MapLibre</span>
+          </div>
+          <a href="./docs/ARCHITECTURE.md" target="_blank">Kiến trúc</a>
+        </footer>
+      </aside>
+
+      <section class="map-shell">
+        <div id="map"></div>
+
+        <div class="map-heading">
+          <span class="map-kicker">CỔNG THÔNG TIN KHÔNG GIAN</span>
+          <strong>Quy hoạch Vĩnh Long</strong>
+          <span id="zoomBadge">z8.9</span>
+        </div>
+
+        <div class="map-legend" aria-label="Chú giải">
+          <span><i class="legend-dot current"></i>Hiện trạng</span>
+          <span><i class="legend-dot direction"></i>Định hướng</span>
+          <span><i class="legend-dot plan"></i>Phương án</span>
+          <span><i class="legend-line admin"></i>Địa giới</span>
+        </div>
+
+        <div id="errorBanner" class="error-banner" hidden></div>
+
+        <aside id="inspectPanel" class="inspect-panel" hidden>
+          <button id="inspectClose" type="button" aria-label="Đóng">×</button>
+          <span id="inspectLayer" class="inspect-layer"></span>
+          <h2 id="inspectTitle">Thông tin đối tượng</h2>
+          <div id="inspectBody"></div>
+        </aside>
+      </section>
     </main>
   </div>
 
