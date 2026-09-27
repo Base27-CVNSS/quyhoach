@@ -98,3 +98,16 @@ python tools/verify_pmtiles.py data/VinhLong.pmtiles
 - PMTiles: BSD-3-Clause.
 - OpenStreetMap / OpenTopoMap / Esri basemap theo điều khoản nguồn tương ứng.
 - Mã nguồn khung repo: MIT; dữ liệu GIS có thể có điều kiện cấp phép riêng.
+
+
+## Cloudflare R2
+
+Object production hiện đã được đặt theo đúng vị trí thực tế trong dashboard:
+
+- Account: `9e48dfe45ae2d641363f0503fda3a32f`
+- Bucket: `vinhlong`
+- Object key: `VinhLong.pmtiles`
+- Kích thước chuẩn: `94,357,111 bytes`
+- SHA-256: `dd17f53abe450c6d31615a09fffd312a84a263381cdd23c117a87a22f0fd68bf`
+
+Ứng dụng ưu tiên nguồn PMTiles theo thứ tự: `?pmtiles=` → `data/pmtiles-source.json` → file local `data/VinhLong.pmtiles`. Chỉ cần điền URL public R2/custom domain thật vào trường `url` trong manifest; không cần sửa runtime.
