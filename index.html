@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#0b1f33" />
+  <title>Vietflex Quy hoạch Vĩnh Long</title>
+  <meta name="description" content="WebGIS quy hoạch Vĩnh Long sử dụng PMTiles đa lớp và MapLibre GL JS." />
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.11.2/dist/maplibre-gl.css" />
+  <link rel="stylesheet" href="./assets/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <aside class="sidebar" aria-label="Danh mục lớp dữ liệu">
+      <header class="brand">
+        <div class="brand-mark">VF</div>
+        <div>
+          <h1>Vietflex Quy hoạch</h1>
+          <p>Vĩnh Long · PMTiles WebGIS</p>
+        </div>
+      </header>
+
+      <section class="dataset-card">
+        <div class="dataset-title">VinhLong.pmtiles</div>
+        <div class="stats-grid">
+          <div><strong id="statLayers">117</strong><span>lớp</span></div>
+          <div><strong id="statFeatures">165.017</strong><span>feature</span></div>
+          <div><strong id="statTiles">7.485</strong><span>tiles</span></div>
+          <div><strong id="statZoom">z7–15</strong><span>zoom</span></div>
+        </div>
+        <div id="datasetStatus" class="status status-loading">Đang đọc PMTiles…</div>
+      </section>
+
+      <section class="toolbar">
+        <input id="layerSearch" type="search" placeholder="Tìm lớp…" autocomplete="off" />
+        <div class="toolbar-row">
+          <button id="showDefaults" type="button">Lớp mặc định</button>
+          <button id="hideAll" type="button">Tắt tất cả</button>
+          <button id="fitBounds" type="button">Toàn tỉnh</button>
+        </div>
+      </section>
+
+      <section class="legend">
+        <span><i class="swatch current"></i>Hiện trạng</span>
+        <span><i class="swatch planned"></i>Định hướng</span>
+        <span><i class="swatch allocation"></i>Phương án</span>
+      </section>
+
+      <section id="layerList" class="layer-list" aria-live="polite"></section>
+
+      <footer class="sidebar-footer">
+        <span>PMTiles v3 · MVT · HTTP Range</span>
+        <a href="https://github.com/Base27-CVNSS/quyhoach" target="_blank" rel="noreferrer">GitHub</a>
+      </footer>
+    </aside>
+
+    <main class="map-shell">
+      <div id="map"></div>
+      <div class="map-title">
+        <strong>Quy hoạch tỉnh Vĩnh Long</strong>
+        <span id="zoomBadge">z9.0</span>
+      </div>
+      <div id="errorBanner" class="error-banner" hidden></div>
+    </main>
+  </div>
+
+  <script src="https://unpkg.com/pmtiles@4.5.0/dist/pmtiles.js"></script>
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
